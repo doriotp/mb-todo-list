@@ -18,7 +18,7 @@ func New(tskStore taskStore) *taskService {
 }
 
 func (ts *taskService) CreateTask(task models.Task) *customerrors.Error {
-	if task.UserId <= 0 || task.Title == "" || task.Description == "" {
+	if task.Title == "" || task.Description == "" {
 		return &customerrors.Error{Code: http.StatusBadRequest, Message: "invalid input"}
 	}
 

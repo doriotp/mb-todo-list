@@ -26,9 +26,24 @@ func (th *taskHandler) CreateTask(c *gin.Context) {
 		return
 	}
 
-	err := th.tskService.CreateTask(task)
+	token := c.GetHeader("Authorization")
+	if token == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing authorization token"})
+		return
+	}
+
+	claims, err := utils.VerifyToken(token)
 	if err != nil {
-		c.JSON(err.Code, gin.H{"message": err.Message})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	userId := int(claims["user_id"].(float64))
+	task.UserId=userId
+
+	customErr := th.tskService.CreateTask(task)
+	if err != nil {
+		c.JSON(customErr.Code, gin.H{"message": customErr.Message})
 	}
 
 	c.JSON(http.StatusCreated, task)
