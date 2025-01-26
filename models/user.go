@@ -1,31 +1,38 @@
-package models 
+package models
 
 type User struct {
-    ID       int 
-    Name     string
-    Email    string
-    Password string
-    Country string
-    Occupation string 
-    Phone string
+	ID         int    `json:"id"`
+	Name       string `json:"name"`
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	Country    string `json:"country"`
+	Occupation string `json:"occupation"`
+	Phone      string `json:"phone"`
+}
+
+type RegisterResponse struct {
+	Name       string `json:"name"`
+	Email      string `json:"email"`
+	Country    string `json:"country"`
+	Occupation string `json:"occupation"`
+	Phone      string `json:"phone"`
+}
+
+type LoginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 type LoginResponse struct {
-    Token string
-    Email    string
+	Token string `json:"token"`
+	Email string `json:"email"`
 }
 
-type CreateResponse struct{
-    Id string 
-    Email string 
-    Name string
-}
-
-type ForgotPasswordRequest struct{
-    Email string
+type ForgotPasswordRequest struct {
+	Email string `json:"email"`
 }
 
 type ResetPasswordRequest struct {
-    NewPassword string 
-    ConfirmNewPassword string
+	NewPassword        string `json:"newPassword"`
+	ConfirmNewPassword string `json:"confirmNewPassword"`
 }
