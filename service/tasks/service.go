@@ -17,9 +17,9 @@ func New(tskStore taskStore) *taskService {
 	return &taskService{tskStore: tskStore}
 }
 
-func (ts *taskService) CreateTask(task models.Task) *customerrors.Error {
+func (ts *taskService) CreateTask(task models.Task) (*models.CreateTaskResponse,*customerrors.Error) {
 	if task.Title == "" || task.Description == "" {
-		return &customerrors.Error{Code: http.StatusBadRequest, Message: "invalid input"}
+		return nil, &customerrors.Error{Code: http.StatusBadRequest, Message: "invalid input"}
 	}
 
 	// userInfo, err := ts.usrStore.GetUserById(task.UserId)
@@ -35,16 +35,25 @@ func (ts *taskService) CreateTask(task models.Task) *customerrors.Error {
 
 	task.CreatedAt=createdAt 
 
-	err := ts.tskStore.CreateTask(task) 
+	id, err := ts.tskStore.CreateTask(task) 
 	if err!=nil{
-		return &customerrors.Error{Code: http.StatusInternalServerError, Message: err.Error()}
+		return nil, &customerrors.Error{Code: http.StatusInternalServerError, Message: err.Error()}
 	}
 
-	return nil
+	createTaskResponse := models.CreateTaskResponse{
+		Id: id,
+		UserId: task.UserId,
+		Title: task.Title,
+		Description: task.Description,
+		IsCompleted: task.IsCompleted,
+		CreatedAt: task.CreatedAt,
+	}
+
+	return &createTaskResponse, nil
 
 }
 
-func (ts *taskService)GetUserTasks(userId, page, size int) (*models.Task, *customerrors.Error){
+func (ts *taskService)GetUserTasks(userId, page, size int) ([]models.Task, *customerrors.Error){
 
 	tasks, err := ts.tskStore.GetUserTasks(userId,page, size )
 	if err!=nil{
@@ -88,7 +97,7 @@ func (ts *taskService)UpdateTaskCompletionStatus(taskId int) (*models.Task, *cus
 
 }
 
-func(ts *taskService)GetUserCompletedTasks(isCompleted bool, userId, page, size int) (*models.Task, *customerrors.Error){
+func(ts *taskService)GetUserCompletedTasks(isCompleted bool, userId, page, size int) ([]models.Task,*customerrors.Error) {
 	CompletedTasks , err := ts.tskStore.GetUserCompletedTasks(isCompleted, userId, page, size)
 	if err!=nil{
 		return nil, &customerrors.Error{Code: http.StatusInternalServerError, Message: err.Error()}

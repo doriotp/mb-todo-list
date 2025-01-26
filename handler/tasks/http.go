@@ -5,8 +5,8 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt"
 	"github.com/todo-list/models"
-	"github.com/todo-list/utils"
 )
 
 type taskHandler struct {
@@ -26,44 +26,39 @@ func (th *taskHandler) CreateTask(c *gin.Context) {
 		return
 	}
 
-	token := c.GetHeader("Authorization")
-	if token == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing authorization token"})
+	claims, exists := c.Get("claims")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Failed to retrieve user claims"})
 		return
 	}
 
-	claims, err := utils.VerifyToken(token)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
+	userId := int(claims.(jwt.MapClaims)["user_id"].(float64))
+	task.UserId = userId
 
-	userId := int(claims["user_id"].(float64))
-	task.UserId=userId
-
-	customErr := th.tskService.CreateTask(task)
-	if err != nil {
+	createTaskResponse, customErr := th.tskService.CreateTask(task)
+	if customErr != nil {
 		c.JSON(customErr.Code, gin.H{"message": customErr.Message})
+		return
 	}
 
-	c.JSON(http.StatusCreated, task)
+	c.JSON(http.StatusCreated, createTaskResponse)
 }
 
 func (th *taskHandler) GetUserTasks(c *gin.Context) {
-	token := c.Request.Header["Authorization"]
-
-	claims, err := utils.VerifyToken(token[0])
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+	claims, exists := c.Get("claims")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Failed to retrieve user claims"})
+		return
 	}
 
-	userId := int(claims["user_id"].(float64))
+	userId := int(claims.(jwt.MapClaims)["user_id"].(float64))
 	page, _ := strconv.Atoi(c.Query("page"))
 	size, _ := strconv.Atoi(c.Query("size"))
 
 	tasks, customErr := th.tskService.GetUserTasks(userId, page, size)
-	if err != nil {
+	if customErr != nil {
 		c.JSON(customErr.Code, gin.H{"message": customErr.Message})
+		return
 	}
 
 	c.JSON(http.StatusOK, tasks)
@@ -74,6 +69,7 @@ func (th *taskHandler) GetTaskById(c *gin.Context) {
 	tasks, customErr := th.tskService.GetTaskById(taskId)
 	if customErr != nil {
 		c.JSON(customErr.Code, gin.H{"message": customErr.Message})
+		return
 	}
 
 	c.JSON(http.StatusOK, tasks)
@@ -84,6 +80,7 @@ func (th *taskHandler) DeleteTaskById(c *gin.Context) {
 	customErr := th.tskService.DeleteTaskById(taskId)
 	if customErr != nil {
 		c.JSON(customErr.Code, gin.H{"message": customErr.Message})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "task deleted successfully"})
@@ -92,54 +89,34 @@ func (th *taskHandler) DeleteTaskById(c *gin.Context) {
 func (th *taskHandler) UpdateTaskCompletionStatus(c *gin.Context) {
 	taskID, _ := strconv.Atoi(c.Param("id"))
 
-	token := c.GetHeader("authorization")
-	if token == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing authorization token"})
-		return
-	}
-
-	_, err := utils.VerifyToken(token)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-
 	tasks, customErr := th.tskService.UpdateTaskCompletionStatus(taskID)
 	if customErr != nil {
-		c.JSON(customErr.Code, gin.H{"error": customErr.Error()})
+		c.JSON(customErr.Code, gin.H{"message": customErr.Error()})
+		return
 	}
 
 	c.JSON(http.StatusOK, tasks)
 }
-
-// 	tasks, err := ts.tskStore.GetTaskById(taskId)
-// 	if err != nil {
-// 		return nil, &customerrors.Error{Code: http.StatusInternalServerError, Message: err.Error()}
-// 	}
-
-// 	return tasks, nil
-
-// }
 
 func (th *taskHandler) GetUserCompletedTasks(c *gin.Context) {
 	var (
 		isCompleted = true
 	)
 
-	token := c.Request.Header["Authorization"]
-
-	claims, err := utils.VerifyToken(token[0])
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+	claims, exists := c.Get("claims")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Failed to retrieve user claims"})
+		return
 	}
 
-	userId := int(claims["user_id"].(float64))
+	userId := int(claims.(jwt.MapClaims)["user_id"].(float64))
 	page, _ := strconv.Atoi(c.Query("page"))
 	size, _ := strconv.Atoi(c.Query("size"))
 
 	CompletedTasks, customErr := th.tskService.GetUserCompletedTasks(isCompleted, userId, page, size)
-	if err != nil {
+	if customErr != nil {
 		c.JSON(customErr.Code, gin.H{"message": customErr.Message})
+		return
 	}
 
 	c.JSON(http.StatusOK, CompletedTasks)
@@ -160,6 +137,7 @@ func (th *taskHandler) UpdateTaskById(c *gin.Context) {
 	tasks, customErr := th.tskService.UpdateTaskById(task, taskID)
 	if customErr != nil {
 		c.JSON(customErr.Code, gin.H{"message": customErr.Message})
+		return
 	}
 
 	c.JSON(http.StatusOK, tasks)

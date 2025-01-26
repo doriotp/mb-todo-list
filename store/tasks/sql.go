@@ -14,29 +14,45 @@ func New(db *sql.DB) *taskStore {
 	return &taskStore{DB: db}
 }
 
-func (ts *taskStore) CreateTask(task models.Task) error {
-	_, err := ts.DB.Exec(`INSERT INTO tasks (id,userId,title,description,
-	isCompleted,createdAt) VALUES ($1,$2,$3,$4,$5,$6)`, task.Id, task.UserId, task.Title, task.Description,
-		task.IsCompleted, task.CreatedAt)
-	return err
-}
-
-func (ts *taskStore) GetUserTasks(userId, page, size int) (*models.Task, error) {
+func (ts *taskStore) CreateTask(task models.Task) (int,error) {
 	var (
-		task models.Task
+		id int
 	)
+	err := ts.DB.QueryRow(`INSERT INTO tasks (user_id, title, description, is_completed, created_at)
+		VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+		task.UserId, task.Title, task.Description, task.IsCompleted, task.CreatedAt).Scan(&id)
 
-	offset := page * size
-	if err := ts.DB.QueryRow("SELECT * FROM tasks WHERE userId=$1 ORDER BY created_at DESC LIMIT $2 OFFSET $3", userId, size, offset).
-		Scan(&task.Id, &task.UserId, &task.Title, &task.Description, &task.IsCompleted); err != nil {
-		if err.Error() == sql.ErrNoRows.Error() {
-			return nil, nil
-		} else {
-			return nil, err
-		}
+	if err != nil {
+		return 0, err
 	}
 
-	return &task, nil
+	return id, nil
+}
+
+func (ts *taskStore) GetUserTasks(userId, page, size int) ([]models.Task, error) {
+	var tasks []models.Task
+
+	offset := page * size
+	rows, err := ts.DB.Query("SELECT * FROM tasks WHERE user_id=$1 ORDER BY created_at DESC LIMIT $2 OFFSET $3", userId, size, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() // Ensure rows are closed to avoid memory leaks
+
+	for rows.Next() {
+		var task models.Task
+		if err := rows.Scan(&task.Id, &task.UserId, &task.Title, &task.Description, &task.IsCompleted, &task.CreatedAt); err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, task)
+	}
+
+	// Check if there was any error during iteration
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return tasks, nil
 }
 
 func (ts *taskStore) GetTaskById(id int) (*models.Task, error) {
@@ -45,7 +61,7 @@ func (ts *taskStore) GetTaskById(id int) (*models.Task, error) {
 	)
 
 	if err := ts.DB.QueryRow("SELECT * FROM tasks WHERE id=$1", id).
-		Scan(&task.Id, &task.UserId, &task.Title, &task.Description, &task.IsCompleted); err != nil {
+		Scan(&task.Id, &task.UserId, &task.Title, &task.Description, &task.IsCompleted, &task.CreatedAt); err != nil {
 		if err.Error() == sql.ErrNoRows.Error() {
 			return nil, nil
 		} else {
@@ -57,8 +73,8 @@ func (ts *taskStore) GetTaskById(id int) (*models.Task, error) {
 }
 
 func (ts *taskStore) UpdateTaskById(task models.Task, id int) (*models.Task, error) {
-	_, err := ts.DB.Exec("UPDATE SET title=$2, description=$3, isCompleted=$4 WHERE id=$5",
-		task.Title, task.Description, task.IsCompleted)
+	_, err := ts.DB.Exec("UPDATE tasks SET title=$1, description=$2,  is_completed=$3 WHERE id=$4",
+		task.Title, task.Description, task.IsCompleted, id)
 	if err != nil {
 		return nil, err
 	}
@@ -77,30 +93,37 @@ func (ts *taskStore) DeleteTaskById(id int) error {
 
 func (ts *taskStore) UpdateTaskCompletionStatus(taskId int) error {
 	// Update the task's 'isCompleted' status in the database
-	_, err := ts.DB.Exec("UPDATE tasks SET isCompleted = true WHERE id = $1", taskId)
+	_, err := ts.DB.Exec("UPDATE tasks SET is_completed = true WHERE id = $1", taskId)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (ts *taskStore) GetUserCompletedTasks(isCompleted bool, userId, page, size int) (*models.Task, error) {
-	var (
-		task models.Task
-	)
+func (ts *taskStore) GetUserCompletedTasks(isCompleted bool, userId, page, size int) ([]models.Task, error) {
+	var tasks []models.Task
 
-	offset := page*size
+	offset := page * size
+	rows, err := ts.DB.Query("SELECT * FROM tasks WHERE user_id=$1 AND is_completed=$2 ORDER BY created_at DESC LIMIT $3 OFFSET $4", userId, isCompleted,size, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() // Ensure rows are closed to avoid memory leaks
 
-	if err := ts.DB.QueryRow("SELECT * FROM tasks WHERE userId=$1 AND isCompleted=$2 ORDER BY created_at DESC LIMIT $3 OFFSET $4", userId, isCompleted,size, offset).
-		Scan(&task.Id, &task.UserId, &task.Title, &task.Description, &task.IsCompleted); err != nil {
-		if err.Error() == sql.ErrNoRows.Error() {
-			return nil, nil
-		} else {
+	for rows.Next() {
+		var task models.Task
+		if err := rows.Scan(&task.Id, &task.UserId, &task.Title, &task.Description, &task.IsCompleted, &task.CreatedAt); err != nil {
 			return nil, err
 		}
+		tasks = append(tasks, task)
 	}
 
-	return &task, nil
+	// Check if there was any error during iteration
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return tasks, nil
 }
 
 

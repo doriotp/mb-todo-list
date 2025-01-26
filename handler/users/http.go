@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt"
 	"github.com/todo-list/models"
 	"github.com/todo-list/utils"
 )
@@ -21,7 +22,6 @@ func (uH *userHandler) Register(c *gin.Context) {
 
 	var (
 		user models.User
-		resp = make(map[string]any)
 	)
 
 	if err := c.ShouldBindJSON(&user); err != nil {
@@ -32,11 +32,15 @@ func (uH *userHandler) Register(c *gin.Context) {
 	err := uH.usrService.CreateUser(user)
 	if err != nil {
 		c.JSON(err.Code, gin.H{"message": err.Message})
+		return
 	}
 
-	resp = map[string]any{
-		"email": user.Email,
-		"name":  user.Name,
+	resp := models.RegisterResponse{
+		Name:       user.Name,
+		Email:      user.Email,
+		Country:    user.Country,
+		Occupation: user.Occupation,
+		Phone:      user.Phone,
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
@@ -47,23 +51,21 @@ func (uH *userHandler) Register(c *gin.Context) {
 
 func (uH *userHandler) Login(c *gin.Context) {
 	var (
-		user models.User
+		loginRequest models.LoginRequest
 	)
 
-	// Check user credentials and generate a JWT token
-	if err := c.ShouldBindJSON(&user); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := c.ShouldBindJSON(&loginRequest); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
 
-	resp, err := uH.usrService.Login(user)
+	resp, err := uH.usrService.Login(loginRequest)
 	if err != nil {
-		c.JSON(err.Code, gin.H{"error": err.Message})
+		c.JSON(err.Code, gin.H{"message": err.Message})
+		return
 	}
 
-	if resp != nil {
-		c.JSON(http.StatusOK, resp)
-	}
+	c.JSON(http.StatusOK, resp)
 }
 
 func (uH *userHandler) ForgotPassword(c *gin.Context) {
@@ -72,13 +74,14 @@ func (uH *userHandler) ForgotPassword(c *gin.Context) {
 	)
 
 	if err := c.ShouldBindJSON(&fpr); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
 
 	err := uH.usrService.ForgotPassword(fpr)
 	if err != nil {
-		c.JSON(err.Code, gin.H{"error": err.Message})
+		c.JSON(err.Code, gin.H{"message": err.Message})
+		return 
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "email sent successfully"})
@@ -90,7 +93,7 @@ func (uH *userHandler) ResetPassword(c *gin.Context) {
 	)
 
 	if err := c.ShouldBindJSON(&rpr); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
 
@@ -98,14 +101,16 @@ func (uH *userHandler) ResetPassword(c *gin.Context) {
 
 	claims, err := utils.VerifyToken(token)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"message": err.Error()})
+		return 
 	}
 
 	id := int(claims["user_id"].(float64))
 
 	customErr := uH.usrService.ResetPassword(rpr, id)
 	if customErr != nil {
-		c.JSON(customErr.Code, gin.H{"error": err.Error()})
+		c.JSON(customErr.Code, gin.H{"message": customErr.Error()})
+		return 
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "password reset successfully"})
@@ -119,19 +124,18 @@ func (uH *userHandler) Logout(c *gin.Context) {
 }
 
 func (uH *userHandler) GetCurrentUser(c *gin.Context) {
-
-	token := c.Request.Header["authorization"]
-
-	claims, err := utils.VerifyToken(token[0])
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+	claims, exists := c.Get("claims")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Failed to retrieve user claims"})
+		return
 	}
 
-	id := int(claims["user_id"].(float64))
+	id := int(claims.(jwt.MapClaims)["user_id"].(float64))
 
 	user, err := uH.usrService.GetCurrentUser(id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return 
 	}
 
 	c.JSON(http.StatusOK, user)
@@ -152,7 +156,8 @@ func (uH *userHandler) UpdateUserDetailsById(c *gin.Context) {
 
 	updatedUserDetails, err := uH.usrService.UpdateUserDetailsById(user, id)
 	if err != nil {
-		c.JSON(err.Code, gin.H{"error": err.Message})
+		c.JSON(err.Code, gin.H{"message": err.Message})
+		return 
 	}
 
 	c.JSON(http.StatusOK, updatedUserDetails)
