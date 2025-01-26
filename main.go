@@ -11,6 +11,8 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file" // Import the file source driver
 	"github.com/joho/godotenv"
+
+	"github.com/todo-list/middleware"
 	userHandler "github.com/todo-list/handler/users"
 	userSvc "github.com/todo-list/service/users"
 	userStore "github.com/todo-list/store/users"
@@ -60,23 +62,27 @@ func main() {
 
 	r := gin.Default()
 
-	// Register user routes
+	// Register routes
 	r.POST("/api/auth/register", usrHandler.Register)
 	r.POST("/api/auth/login", usrHandler.Login) 
 	r.POST("/api/auth/forgot", usrHandler.ForgotPassword)
 	r.POST("/api/auth/password/reset", usrHandler.ResetPassword)
 	r.POST("api/auth/logout", usrHandler.Logout)
-	r.GET("api/users/current", usrHandler.GetCurrentUser)
-	r.PUT("/api/users/{id}",usrHandler.UpdateUserDetailsById )
 
-	//Register task routes 
-	r.POST("/api/tasks",tskHandler.CreateTask ) 
-	r.GET("api/tasks", tskHandler.GetUserTasks) 
-	r.GET("api/tasks/{id}", tskHandler.GetTaskById)  
-	r.PUT("api/tasks/:id", tskHandler.UpdateTaskById) 
-	r.DELETE("api/tasks/{id}", tskHandler.DeleteTaskById)
-	r.PUT("/api/tasks/:id/mark", tskHandler.UpdateTaskCompletionStatus) 
-	r.GET("/api/tasks/completed", tskHandler.GetUserCompletedTasks)   
+	// Protected routes (require authentication)
+protected := r.Group("/api")
+protected.Use(middleware.AuthMiddleware()) // Apply AuthMiddleware to the protected routes
+{
+    protected.GET("/users/current", usrHandler.GetCurrentUser)
+    protected.PUT("/users/{id}", usrHandler.UpdateUserDetailsById)
+    protected.POST("/tasks", tskHandler.CreateTask)
+    protected.GET("/tasks", tskHandler.GetUserTasks)
+    protected.GET("/tasks/:id", tskHandler.GetTaskById)
+    protected.PUT("/tasks/:id", tskHandler.UpdateTaskById)
+    protected.DELETE("/tasks/:id", tskHandler.DeleteTaskById)
+    protected.PUT("/tasks/:id/mark", tskHandler.UpdateTaskCompletionStatus)
+    protected.GET("/tasks/completed", tskHandler.GetUserCompletedTasks)
+}   
 
 	// Start the server
 	if err := r.Run(":8080"); err != nil {
