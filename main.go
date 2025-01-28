@@ -106,7 +106,7 @@ func RunMigrations(db *sql.DB) error {
 
 	m, err := migrate.NewWithDatabaseInstance(
 		"file://migrations",
-		"railway", driver)
+		"todo_medm", driver)
 	if err != nil {
 		return err
 	}
