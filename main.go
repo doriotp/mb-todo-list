@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -65,6 +66,17 @@ func main() {
 
 	r := gin.Default()
 
+	port := os.Getenv("PORT")
+
+	if port == "" {
+		log.Fatal("$PORT must be set")
+	}
+
+	r.GET("/", func(ctx *gin.Context) {
+		resp := fmt.Sprintf("server started on port %s", port)
+		ctx.JSON(http.StatusOK, resp)
+	})
+
 	// Register routes
 	r.POST("/api/auth/register", usrHandler.Register)
 	r.POST("/api/auth/login", usrHandler.Login)
@@ -85,12 +97,6 @@ func main() {
 		protected.DELETE("/tasks/:id", tskHandler.DeleteTaskById)
 		protected.PUT("/tasks/:id/mark", tskHandler.UpdateTaskCompletionStatus)
 		protected.GET("/tasks/completed", tskHandler.GetUserCompletedTasks)
-	}
-
-	port := os.Getenv("PORT")
-
-	if port == "" {
-		log.Fatal("$PORT must be set")
 	}
 
 	// Start the server
