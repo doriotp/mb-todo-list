@@ -24,7 +24,6 @@ import (
 
 func init() {
 	if os.Getenv("WORKING_ENV") != "production" {
-		log.Println(os.Getenv("WORKING_ENV"))
 		err := godotenv.Load(".env")
 		if err != nil {
 			log.Fatalf("error:%s", err)
@@ -98,6 +97,8 @@ func main() {
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+
+	log.Println("Server started on port ", port)
 
 }
 
