@@ -23,9 +23,11 @@ import (
 )
 
 func init() {
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Fatalf("error:%s", err)
+	if os.Getenv("WORKING_ENV") != "production" {
+		err := godotenv.Load(".env")
+		if err != nil {
+			log.Fatalf("error:%s", err)
+		}
 	}
 }
 
@@ -92,7 +94,7 @@ func main() {
 	}
 
 	// Start the server
-	if err := r.Run(":"+port); err != nil {
+	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 
